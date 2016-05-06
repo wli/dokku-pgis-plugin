@@ -14,7 +14,7 @@ Installation
 ------------
 ```
 cd /var/lib/dokku/plugins
-git clone https://github.com/fermuch/dokku-pg-plugin.git postgis
+git clone https://github.com/wli/dokku-pg-plugin.git postgis
 dokku plugins-install
 ```
 
@@ -92,4 +92,9 @@ dokku postgis:info foo
 List of containers:
 ```
 dokku postgis:list
+```
+
+Dump database:
+```
+dokku postgis:dump
 ```
