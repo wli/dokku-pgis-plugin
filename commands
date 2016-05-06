@@ -17,11 +17,43 @@ if [[ $1 == postgis:* ]]; then
     fi
 fi
 
-# Create .postgis diretory of not exists
+# Create .postgis directory if not exists
 if [[ ! -d $DOKKU_ROOT/.postgis ]]; then
     mkdir -p $DOKKU_ROOT/.postgis
     chown -R dokku: $DOKKU_ROOT/.postgis
 fi
+
+function check_postgresql_container() {
+    if [[ ! -f "$DOKKU_ROOT/.postgis/pwd_$APP" ]]; then
+        echo "Unknown (or too old) PostGIS container"
+        exit 1
+    fi
+}
+
+function check_postgresql_tool() {
+    local tool_name="$1"
+    if [[ $(whereis $tool_name | awk '{ print NF }') -eq 1 ]]; then
+        echo "'${tool_name}' not found. Is the package 'postgresql-client' installed?" 1>&2
+        exit 1
+    fi
+}
+
+function get_postgresql_id() {
+    ID=$(docker ps | grep postgis/"$APP":latest | awk {'print $1'})
+    echo $ID
+}
+
+function get_postgresql_ip() {
+    ID=$(get_postgresql_id)
+    IP=$(docker inspect --format '{{ .NetworkSettings.Gateway }}' $ID)
+    echo $IP
+}
+
+function get_postgresql_port() {
+    ID=$(get_postgresql_id)
+    PORT=$(docker port "$ID" 5432 | sed 's/0.0.0.0://')
+    echo $PORT
+}
 
 case "$1" in
 
@@ -162,7 +194,21 @@ case "$1" in
         echo "  - $CONTAINER"
     done
     ;;
+    
+  postgis:dump)
+    check_postgresql_container
+    check_postgresql_tool pg_dump
+    export PGPASSWORD=$(cat "$DOKKU_ROOT/.postgis/pwd_$APP")
+    IP=$(get_postgresql_ip)
+    PORT=$(get_postgresql_port)
 
+    pg_dump -h $IP -p $PORT -U root -c -O db
+
+    # echo to stderr, as stdout will probably be redirected to a file
+    echo 1>&2
+    echo "-----> $APP database dumped" 1>&2
+    ;;
+    
   help)
     cat && cat<<EOF
     postgis:create <app>     Create a postgis container
